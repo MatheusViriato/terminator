@@ -4,6 +4,7 @@
   "description": "Bot for Whatsapp with Twilio and IBM Watson",
   "main": "app.js",
   "scripts": {
+    "start": "node app.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "Matheus Viriato",
