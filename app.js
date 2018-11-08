@@ -1,5 +1,4 @@
 // var twilio = require('twilio');
-// mongodb://admin:HvepGpLky2a396k@ds241723.mlab.com:41723/heroku_kcq2vng8
 var express = require('express');
 var app = express();
 var xml = require('xml');
@@ -30,6 +29,8 @@ const con = mysql.createConnection({
 
 const port = process.env.PORT;
 
+var cellphone = '';
+var userMessage = '';
 
 // var accountSid = 'AC14f751338ac223f4ace9c3ba7d33948a';
 // var authToken = '06addbe70348d1ab4c1144bbde690ea8';
@@ -37,7 +38,7 @@ const port = process.env.PORT;
 
 // chatbot.message({workspace_id}, trataResposta);
 
-function trataResposta(err, resposta){
+function callbackMessage(err, response){
     //caso tenha erro
     if(err){
         console.log(err);
@@ -45,25 +46,29 @@ function trataResposta(err, resposta){
     }
 
     //detectando intenção do usuário
-    if(resposta.intents.length > 0){
-        console.log('Eu detectei a intenção: ' + resposta.intents[0].intent);
+    if(response.intents.length > 0){
+        console.log('Eu detectei a intenção: ' + response.intents[0].intent);
         //verificando se a intenção é despedida para fim de conversa
-        // if(resposta.intents[0].intent == 'despedida'){
+        // if(response.intents[0].intent == 'despedida'){
         //     fimDeConversa = true;
         // }
     }
 
     //exibe a resposta do diálogo, caso aja
-    if(resposta.output.text.length > 0){
-        // console.log(resposta.output.text[0]);
-        gravaRespostaWatson(resposta.output.text[0]);
-        gravaContexto(resposta.context);
+    if(response.output.text.length > 0){
+        saveWatsonResponse(response.output.text[0], cellphone);
+        saveContext(response.context, cellphone);
+        saveAllChat(cellphone, response.context, userMessage, response.output.text[0]);
     }
 }
 
-// gravaUsuario('whatsapp:+5511983656701');
-
 // var sql = "delete from sessao_watson where cel = 'whatsapp:+5511983656701'";
+// con.query(sql, function (err, result) {
+//     if(!err) console.log('Contexto salvo!');
+//     else console.log(err);
+// });
+
+// var sql = "delete from cardapio_padrao";
 // con.query(sql, function (err, result) {
 //     if(!err) console.log('Contexto salvo!');
 //     else console.log(err);
@@ -87,80 +92,104 @@ function trataResposta(err, resposta){
 //     else console.log(err);
 // });
 
-function gravaContexto(contexto){
-    var sql = "update sessao_watson set contexto = '" + JSON.stringify(contexto) + "' where cel = 'whatsapp:+5511983656701'";
-    con.query(sql, function (err, result) {
-        if(!err) console.log('Contexto salvo!');
-        else console.log(err);
-    });
-}
-
-function getContexto(callback){
-    var sql = "select contexto from sessao_watson where cel = 'whatsapp:+5511983656701'";
-    con.query(sql, function (err, result) {
-        callback(result[0].contexto);
-    });
-}
-
-function gravaRespostaWatson(resposta){
-    var sql = "update sessao_watson set resposta_watson = '" + resposta + "' where cel = 'whatsapp:+5511983656701'";
-    con.query(sql, function (err, result) {
-        if(!err) console.log('Resposta do watson salva!');
-        else console.log(err);
-    });
-}
-
-function getRespostaWatson(callback){
-    var sql = "select resposta_watson from sessao_watson where cel = 'whatsapp:+5511983656701'";  
-    con.query(sql, this.teste, function (err, result) {
-        callback(result[0].resposta_watson);
-    });
-}
-
-function gravaUsuario(celularUsuario){
-    var sql = "insert into sessao_watson(cel, mensagem_usuario, resposta_watson, contexto) values('" + celularUsuario + "', '', '', '') ";
+function saveAllChat(cellphone, context, userMessage, watson_response){
+    var sql = "insert into informacao_chat(cel, contexto, mensagem_usuario, resposta_watson) values('" + cellphone + "', '" + JSON.stringify(context) + "', '" + userMessage + "', '" + watson_response + "') ";
     con.query(sql, function (err, result) {
         if(!err) console.log('Usuário cadastrado!');
         else console.log(err);
     });
 }
 
+function saveContext(context, cellphone){
+    var sql = "update sessao_watson set contexto = '" + JSON.stringify(context) + "' where cel = '" + cellphone + "'";
+    con.query(sql, function (err, result) {
+        if(!err) console.log('Contexto salvo!');
+        else console.log(err);
+    });
+}
+
+function getContext(callback, cellphone){
+    var sql = "select contexto from sessao_watson where cel = '" + cellphone + "'";
+    con.query(sql, function (err, result) {
+        callback(result[0].contexto);
+    });
+}
+
+function saveWatsonResponse(response, cellphone){
+    var sql = "update sessao_watson set resposta_watson = '" + response + "' where cel = '" + cellphone + "'";
+    con.query(sql, function (err, result) {
+        if(!err) console.log('Resposta do watson salva!');
+        else console.log(err);
+    });
+}
+
+function getWatsonResponse(callback, cellphone){
+    var sql = "select resposta_watson from sessao_watson where cel = '" + cellphone + "'";  
+    con.query(sql, function (err, result) {
+        callback(result[0].resposta_watson);
+    });
+}
+
+function getUser(callback, cellphone){
+    var sql = "select cel from sessao_watson where cel = '" + cellphone + "'";  
+    con.query(sql, function (err, result) {
+        try {
+            callback(result[0].cel);
+        }
+        catch(e){
+            callback('');
+        }
+    });
+}
+
+function saveUser(cellphone){
+    getUser(function(result){
+        if(result === ''){
+            var sql = "insert into sessao_watson(cel, mensagem_usuario, resposta_watson, contexto) values('" + cellphone + "', '', '', '') ";
+            con.query(sql, function (err, result) {
+                if(!err) console.log('Usuário cadastrado!');
+                else console.log(err);
+            });
+        }
+    }, cellphone);
+}
+
 app.post('/', function (req, res) {
 
-    // celular from: req.body.From
-    // gravaUsuario(req.body.From);
+    cellphone = req.body.From;
+    saveUser(cellphone);
 
-    //começando a conversação com uma mensagem vazia
-    //para forçar o chatbot dar as boas vindas
-    var mensagemusuario = req.body.Body;
+    // começando a conversação com uma mensagem vazia
+    // para forçar o chatbot dar as boas vindas
+    userMessage = req.body.Body;
 
-    getContexto(function(contexto){
-        if(contexto != '') var contexto_obj = JSON.parse(contexto);
-        else var contexto_obj = {};
+    getContext(function(context){
+        if(context != '') var context_obj = JSON.parse(context);
+        else var context_obj = {};
         chatbot.message({
             workspace_id,
-            input: {text: mensagemusuario},
-            context: contexto_obj
-        }, trataResposta);
-    });
+            input: {text: userMessage},
+            context: context_obj
+        }, callbackMessage);
+    }, cellphone);
 
     setTimeout(function(){
-        getRespostaWatson(function(resposta_watson){
+        getWatsonResponse(function(watson_response){
             res.contentType('application/xml;charset=utf-8');
-            console.log(resposta_watson);
-            var resposta_body = 
+            console.log(watson_response);
+            var body_response = 
             [ 
                 {
                     Response: [{
                         Message: [{
-                            Body: resposta_watson
+                            Body: watson_response
                         }]
                     }]
                 } 
             ];
-            res.send(xml(resposta_body));
-        });
-    }, 3000);
+            res.send(xml(body_response));
+        }, cellphone);
+    }, 2000);
 });
 
 app.listen(port, function () {
